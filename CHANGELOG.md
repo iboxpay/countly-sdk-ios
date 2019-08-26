@@ -1,3 +1,64 @@
+## 19.08
+- Added temporary device ID mode
+- Added support for Carthage
+- Added custom URL session configuration support
+- Added custom segmentation support on view tracking
+- Added ability to change app key on the run
+- Added ability to flush queues
+- Added `pushTestMode` property and discarded `isTestDevice` property
+- Fixed `WCSessionDelegate` interception
+- Fixed title and message check in push notification payloads
+- Fixed binary image name extraction for crash reports
+- Fixed missing delegate forwarding for `userNotificationCenter:openSettingsForNotification:` method
+- Fixed in-app alerts on iOS10+ devices when a silent notification with alert key arrives
+- Discarded device ID persistency on Keychain
+- Discarded OpenUDID device ID option
+- Discarded IDFA device ID option
+- Discarded zero IDFA fix
+- Updated default device ID on tvOS as `identifierForVendor` 
+
+- Other various improvements
+    - Renamed `forceDeviceIDInitialization` flag as `resetStoredDeviceID`
+    - Added lightweight generics for segmentation parameters
+    - Added dSYM upload script to preserved paths in Podspec
+    - Updated dSYM upload script to support paths with spaces     
+    - Changed request cache policy to `NSURLRequestReloadIgnoringLocalCacheData`
+    - Added battery level for watchOS 4.0+
+    - Added JSON validity check before converting objects
+    - Deleted unused `kCountlyCRKeyLoadAddress` constant
+    - Improved internal logging in binary images processing for crash reports
+    - Added persistency for generated `NSUUID`
+    - Added precaution to prevent invalid requests from being added to queue
+    - Discarded null check on request queue
+    - Discarded all APM related files
+    - Added length check for view tracking view name
+    - Added length check for view tracking exceptions
+    - Updated HeaderDocs, internal logs, inline notes and pragma marks 
+
+
+
+## 19.02
+- Added push notification support for macOS
+- Added provisional push notification permission support for iOS12
+- Added remote config feature
+- Added `recordPushNotificationToken` method to be used after device ID changes
+- Added `clearPushNotificationToken` method to be used after device ID changes
+- Discarded `Push Open` event and replaced it with `Push Action` event
+- Fixed push notification token not being sent on some iOS12 devices
+- Fixed device ID change request delaying issue by discarding delay altogether
+- Fixed internal view controller presenting failure when root view controller is not ready yet
+- Fixed `openURL` freeze caused by iOS
+- Fixed wrong `kCountlyQSKeyLocationIP` key in location info requests
+- Fixed missing app key in feedback widget requests
+- Fixed feedback widget dismiss button position
+
+- Other various improvements
+    - Discarded separate UIWindow usage for presenting feedback widgets
+    - Added checksum to feedback widget requests
+    - Improved internal logging for request queue
+
+
+
 ## 18.08
 - Added feedback widgets support
 - Added limit for number of custom crash logs (100 logs)

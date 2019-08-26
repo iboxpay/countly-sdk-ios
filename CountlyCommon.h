@@ -6,15 +6,12 @@
 
 #import <Foundation/Foundation.h>
 #import "Countly.h"
-#import "Countly_OpenUDID.h"
 #import "CountlyPersistency.h"
 #import "CountlyConnectionManager.h"
 #import "CountlyEvent.h"
 #import "CountlyUserDetails.h"
 #import "CountlyDeviceInfo.h"
 #import "CountlyCrashReporter.h"
-#import "CountlyAPMNetworkLog.h"
-#import "CountlyAPM.h"
 #import "CountlyConfig.h"
 #import "CountlyViewTracking.h"
 #import "CountlyStarRating.h"
@@ -22,6 +19,7 @@
 #import "CountlyNotificationService.h"
 #import "CountlyConsentManager.h"
 #import "CountlyLocationManager.h"
+#import "CountlyRemoteConfig.h"
 
 #if DEBUG
 #define COUNTLY_LOG(fmt, ...) CountlyInternalLog(fmt, ##__VA_ARGS__)
@@ -64,6 +62,7 @@ NS_ERROR_ENUM(kCountlyErrorDomain)
 {
     CLYErrorFeedbackWidgetNotAvailable = 10001,
     CLYErrorFeedbackWidgetNotTargetedForDevice = 10002,
+    CLYErrorRemoteConfigGeneralAPIError = 10011,
 };
 
 @interface CountlyCommon : NSObject
@@ -88,6 +87,7 @@ void CountlyInternalLog(NSString *format, ...) NS_FORMAT_FUNCTION(1,2);
 
 #if (TARGET_OS_IOS || TARGET_OS_TV)
 - (UIViewController *)topViewController;
+- (void)tryPresentingViewController:(UIViewController *)viewController;
 #endif
 
 - (void)startAppleWatchMatching;
@@ -105,6 +105,9 @@ void CountlyInternalLog(NSString *format, ...) NS_FORMAT_FUNCTION(1,2);
 @end
 #endif
 
+@interface CLYDelegateInterceptor : NSObject
+@property (nonatomic, weak) id originalDelegate;
+@end
 
 @interface NSString (Countly)
 - (NSString *)cly_URLEscaped;

@@ -15,20 +15,33 @@ extern NSString* const CLYCrashReporting;
 extern NSString* const CLYAutoViewTracking;
 #elif TARGET_OS_TV
 extern NSString* const CLYAutoViewTracking;
+#elif TARGET_OS_OSX
+extern NSString* const CLYPushNotifications;
 #endif
-//NOTE: Disable APM feature until Countly Server completely supports it
-// extern NSString* const CLYAPM;
 
 
 //NOTE: Device ID options
-#if TARGET_OS_IOS
-extern NSString* const CLYIDFV;
-extern NSString* const CLYIDFA DEPRECATED_MSG_ATTRIBUTE("Use CLYIDFV instead!");
-extern NSString* const CLYOpenUDID DEPRECATED_MSG_ATTRIBUTE("Use CLYIDFV instead!");
-#elif TARGET_OS_OSX
-extern NSString* const CLYOpenUDID DEPRECATED_MSG_ATTRIBUTE("Use custom device ID instead!");
-#endif
+/**
+ * Can be used as device ID to switch back to default device ID, if a custom device ID is set before.
+ * @discussion It can be used as @c deviceID on initial configuration, or passed as an argument for @c deviceID parameter on @c setNewDeviceID:onServer: method.
+ * @discussion On iOS and tvOS, it will be identifierForVendor.
+ * @discussion On watchOS and macOS, it will be a persistently stored random NSUUID string.
+ */
+extern NSString* const CLYDefaultDeviceID;
 
+/**
+ * Use this as device ID for keeping all requests on hold until the real device ID is set later.
+ * @discussion It can be used as @c deviceID on initial configuration, or passed as an argument for @c deviceID parameter on @c setNewDeviceID:onServer: method.
+ * @discussion As long as device ID is @c CLYTemporaryDeviceID, all requests will be on hold, but they will be persistently stored.
+ * @discussion Later when the real device ID is set using @c setNewDeviceID:onServer: method, all requests kept on hold so far will start with the real device ID.
+ * @discussion When in @c CLYTemporaryDeviceID mode, method calls for presenting feedback widgets and updating remote config will be ignored.
+ */
+extern NSString* const CLYTemporaryDeviceID;
+
+//NOTE: Legacy device ID options
+extern NSString* const CLYIDFV DEPRECATED_MSG_ATTRIBUTE("Please use CLYDefaultDeviceID instead!");
+extern NSString* const CLYIDFA DEPRECATED_MSG_ATTRIBUTE("Please use CLYDefaultDeviceID instead!");
+extern NSString* const CLYOpenUDID DEPRECATED_MSG_ATTRIBUTE("Please use CLYDefaultDeviceID instead!");
 
 //NOTE: Available consents
 extern NSString* const CLYConsentSessions;
@@ -42,18 +55,23 @@ extern NSString* const CLYConsentAttribution;
 extern NSString* const CLYConsentStarRating;
 extern NSString* const CLYConsentAppleWatch;
 
+//NOTE: Push Notification Test Modes
+extern NSString* const CLYPushTestModeDevelopment;
+extern NSString* const CLYPushTestModeTestFlightOrAdHoc;
 
 @interface CountlyConfig : NSObject
 
 /**
  * County Server's URL without the slash at the end.
  * @discussion e.g. @c https://example.com
+ * @discussion Host needs to be a non-zero length string, otherwise an exception is thrown.
  */
 @property (nonatomic, copy) NSString* host;
 
 /**
  * Application's App Key found on Countly Server's "Management > Applications" section.
  * @discussion Using API Key or App ID will not work.
+ * @discussion App key needs to be a non-zero length string, otherwise an exception is thrown.
  */
 @property (nonatomic, copy) NSString* appKey;
 
@@ -73,7 +91,6 @@ extern NSString* const CLYConsentAppleWatch;
  * @discussion @c CLYPushNotifications for push notifications,
  * @discussion @c CLYCrashReporting for crash reporting,
  * @discussion @c CLYAutoViewTracking for auto view tracking and
- * @discussion @c CLYAPM for application performance management.
  */
 @property (nonatomic, copy) NSArray* features;
 
@@ -88,10 +105,20 @@ extern NSString* const CLYConsentAppleWatch;
 #pragma mark -
 
 /**
- * For manually marking a device as test device for @c CLYPushNotifications feature.
- * @discussion Test push notifications can be sent to test devices by selecting "Development & test users only" on "Create Push Notification" section on Countly Server.
+ * @c isTestDevice property is deprecated. Please use @c pushTestMode property instead.
+ * @discussion Using this property will have no effect.
  */
-@property (nonatomic) BOOL isTestDevice;
+@property (nonatomic) BOOL isTestDevice DEPRECATED_MSG_ATTRIBUTE("Use 'pushTestMode' property instead!");;
+
+/**
+ * For specifying which test mode Countly Server should use for sending push notifications.
+ * @discussion There are 2 test modes:
+ * @discussion - @c CLYPushTestModeDevelopment: For development/debug builds signed with a development provisioning profile. Countly Server will send push notifications to Sandbox APNs.
+ * @discussion - @c CLYPushTestModeTestFlightOrAdHoc: For TestFlight or AdHoc builds signed with a distribution provisioning profile. Countly Server will send push notifications to Production APNs.
+ * @discussion If set, Test Users mark should be selected on Create Push Notification screen of Countly Server to send push notifications.
+ * @discussion If not set, Countly Server will use Production APNs by default.
+ */
+@property (nonatomic) NSString* pushTestMode;
 
 /**
  * For sending push tokens to Countly Server even for users who have not granted permission to display notifications.
@@ -104,6 +131,12 @@ extern NSString* const CLYConsentAppleWatch;
  * @discussion If set, push notifications that contain a message or a URL visit request will not show alerts automatically. Push Open event will be recorded automatically, but Push Action event needs to be recorded manually, as well as displaying the message manually.
  */
 @property (nonatomic) BOOL doNotShowAlertForNotifications;
+
+/**
+ * For handling push notifications for macOS apps on launch.
+ * @discussion Needs to be set in @c applicationDidFinishLaunching: method of macOS apps that uses @c CLYPushNotifications feature, in order to handle app launches by push notification click.
+ */
+@property (nonatomic) NSNotification* launchNotification;
 
 #pragma mark -
 
@@ -138,26 +171,32 @@ extern NSString* const CLYConsentAppleWatch;
 #pragma mark -
 
 /**
- * @discussion Custom or system generated device ID. If not set, Identifier For Vendor (IDFV) will be used by default.
- * @discussion Available system generated device ID options:
- * @discussion @c CLYIDFV (Identifier For Vendor)
- * @discussion @c CLYIDFA (Identifier For Advertising)
- * @discussion @c CLYOpenUDID (OpenUDID)
- * @discussion Once set, device ID will be stored persistently (even after app delete and re-install) and will not change even if another device ID is set on start, unless @c forceDeviceIDInitialization flag is set.
+ * @discussion Custom or system generated device ID.
+ * @discussion If not set, Identifier For Vendor (IDFV) will be used by default on iOS.
+ * @discussion If not set, a random NSUUID will be used by default on watchOS, tvOS and macOS.
+ * @discussion Once set, device ID will be stored persistently and will not change even if another device ID is set on next start, unless @c resetStoredDeviceID flag is set.
  */
 @property (nonatomic, copy) NSString* deviceID;
 
 /**
- * For forcing device ID initialization on start.
- * @discussion When it is set, persistently stored device ID will be reset and new device ID will be re-initialized using @c deviceID property on @c CountlyConfig object. It is meant to be used for debugging purposes only while developing.
+ * For resetting persistently stored device ID on SDK start.
+ * @discussion If set, persistently stored device ID will be reset and new device ID specified on @c deviceID property of @c CountlyConfig object will be stored and used.
+ * @discussion It is meant to be used for debugging purposes only while developing.
  */
-@property (nonatomic) BOOL forceDeviceIDInitialization;
+@property (nonatomic) BOOL resetStoredDeviceID;
 
 /**
- * For applying zero-IDFA fix on queued requests.
- * @discussion If set, all requests in persistently stored request queue will be checked against zero-IDFA issue. If found, they will be fixed by either replacing with IDFV or removing from queue.
+ * @c forceDeviceIDInitialization property is deprecated. Please use @c resetStoredDeviceID property instead.
+ * @discussion Using this property will have no effect.
  */
-@property (nonatomic) BOOL applyZeroIDFAFix;
+@property (nonatomic) BOOL forceDeviceIDInitialization DEPRECATED_MSG_ATTRIBUTE("Use 'resetStoredDeviceID' property instead!");
+
+/**
+ * @c applyZeroIDFAFixFor property is deprecated.
+ * @discussion As IDFA is not supported anymore, @c applyZeroIDFAFix is now inoperative.
+ * @discussion Using this property will have no effect.
+ */
+@property (nonatomic) BOOL applyZeroIDFAFix DEPRECATED_MSG_ATTRIBUTE("As IDFA is not supported anymore, 'applyZeroIDFAFix' is now inoperative!");
 
 #pragma mark -
 
@@ -211,8 +250,11 @@ extern NSString* const CLYConsentAppleWatch;
 
 /**
  * For using custom crash segmentation with @c CLYCrashReporting feature.
+ * @discussion Crash segmentation should be an @c NSDictionary, with keys and values are both @c NSString's only.
+ * @discussion Custom objects in crash segmentation will cause crash report not to be sent to Countly Server.
+ * @discussion Nested values in crash segmentation will be ignored by Counly Server.
  */
-@property (nonatomic, copy) NSDictionary* crashSegmentation;
+@property (nonatomic, copy) NSDictionary<NSString *, NSString *>* crashSegmentation;
 
 /**
  * Crash log limit is used for limiting the number of crash logs to be stored on the device.
@@ -250,6 +292,12 @@ extern NSString* const CLYConsentAppleWatch;
  */
 @property (nonatomic, copy) NSString* secretSalt;
 
+/**
+ * Custom URL session configuration to be used with all requests.
+ * @discussion If not set, @c NSURLSessionConfiguration's @c defaultSessionConfiguration will be used by default.
+ */
+@property (nonatomic, copy) NSURLSessionConfiguration* URLSessionConfiguration;
+
 #pragma mark -
 
 /**
@@ -275,6 +323,24 @@ extern NSString* const CLYConsentAppleWatch;
  * @discussion Completion block has a single NSInteger parameter that indicates 1 to 5 star-rating given by user. If user dismissed dialog without giving a rating, this value will be 0 and it will not be reported to Countly Server.
  */
 @property (nonatomic, copy) void (^starRatingCompletion)(NSInteger rating);
+
+#pragma mark -
+
+/**
+ * For enabling automatic fetching of remote config values.
+ * @discussion If set, Remote Config values specified on Countly Server will be fetched on beginning of sessions.
+ */
+@property (nonatomic) BOOL enableRemoteConfig;
+
+/**
+ * Completion block to be executed after remote config is fetched from Countly Server, on start or device ID change.
+ * @discussion This completion block can be used to detect updating of remote config values is completed, either with success or failure.
+ * @discussion It has an @c NSError parameter that will be either @ nil or an @c NSError object, depending of request result.
+ * @discussion If there is no error, it will be executed with an @c nil, which means latest remote config values are ready to be used.
+ * @discussion If Countly Server is not reachable or if there is another error, it will be executed with an @c NSError indicating the problem.
+ * @discussion If @c enableRemoteConfig flag is not set on initial config, it will never be executed.
+ */
+@property (nonatomic, copy) void (^remoteConfigCompletionHandler)(NSError * _Nullable error);
 
 NS_ASSUME_NONNULL_END
 
