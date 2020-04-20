@@ -27,6 +27,7 @@ NSString* const kCountlyMetricKeyDensity            = @"_density";
 NSString* const kCountlyMetricKeyLocale             = @"_locale";
 NSString* const kCountlyMetricKeyHasWatch           = @"_has_watch";
 NSString* const kCountlyMetricKeyInstalledWatchApp  = @"_installed_watch_app";
+NSString* const kCountlyMetricKeyNetworkType        = @"_network_type";
 
 #if TARGET_OS_IOS
 @interface CountlyDeviceInfo ()
@@ -214,6 +215,90 @@ NSString* const kCountlyMetricKeyInstalledWatchApp  = @"_installed_watch_app";
     return [NSBundle.mainBundle objectForInfoDictionaryKey:(NSString*)kCFBundleVersionKey];
 }
 
++ (NSString *)networkType
+{
+    typedef enum : NSInteger
+       {
+           CLYConnectionNone,
+           CLYConnectionWiFi,
+           CLYConnectionCellNetwork,
+           CLYConnectionCellNetwork2G,
+           CLYConnectionCellNetwork3G,
+           CLYConnectionCellNetworkLTE
+       } CLYConnectionType;
+    
+    NSString* networkType = @"unknown";
+    CLYConnectionType connType = CLYConnectionNone;
+    
+    @try
+        {
+            struct ifaddrs *interfaces, *i;
+
+            if (!getifaddrs(&interfaces))
+            {
+                i = interfaces;
+
+                while (i != NULL)
+                {
+                    if (i->ifa_addr->sa_family == AF_INET)
+                    {
+                        if ([[NSString stringWithUTF8String:i->ifa_name] isEqualToString:@"pdp_ip0"])
+                        {
+
+    #if TARGET_OS_IOS
+                            NSDictionary* connectionTypes =
+                            @{
+                                CTRadioAccessTechnologyGPRS: @(CLYConnectionCellNetwork2G),
+                                CTRadioAccessTechnologyEdge: @(CLYConnectionCellNetwork2G),
+                                CTRadioAccessTechnologyCDMA1x: @(CLYConnectionCellNetwork2G),
+                                CTRadioAccessTechnologyWCDMA: @(CLYConnectionCellNetwork3G),
+                                CTRadioAccessTechnologyHSDPA: @(CLYConnectionCellNetwork3G),
+                                CTRadioAccessTechnologyHSUPA: @(CLYConnectionCellNetwork3G),
+                                CTRadioAccessTechnologyCDMAEVDORev0: @(CLYConnectionCellNetwork3G),
+                                CTRadioAccessTechnologyCDMAEVDORevA: @(CLYConnectionCellNetwork3G),
+                                CTRadioAccessTechnologyCDMAEVDORevB: @(CLYConnectionCellNetwork3G),
+                                CTRadioAccessTechnologyeHRPD: @(CLYConnectionCellNetwork3G),
+                                CTRadioAccessTechnologyLTE: @(CLYConnectionCellNetworkLTE),
+                            };
+
+                            NSString* radioAccessTech = CountlyDeviceInfo.sharedInstance.networkInfo.currentRadioAccessTechnology;
+                            if (connectionTypes[radioAccessTech])
+                                connType = [connectionTypes[radioAccessTech] integerValue];
+                                switch (connType) {
+                                    case CLYConnectionCellNetwork2G:
+                                        networkType = @"2G";
+                                        break;
+                                    case CLYConnectionCellNetwork3G:
+                                        networkType = @"3G";
+                                        break;
+                                    case CLYConnectionCellNetworkLTE:
+                                        networkType = @"4G";
+                                        break;
+                                    default:
+                                        networkType = @"none";
+                                        break;
+                                }
+    #endif
+                        }
+                        else if ([[NSString stringWithUTF8String:i->ifa_name] isEqualToString:@"en0"])
+                        {
+                            networkType = @"wifi";
+                        }
+                    }
+
+                    i = i->ifa_next;
+                }
+            }
+
+            freeifaddrs(interfaces);
+        }
+        @catch (NSException *exception)
+        {
+            COUNTLY_LOG(@"Connection type can not be retrieved: \n%@", exception);
+        }
+    return networkType;
+}
+
 #if TARGET_OS_IOS
 + (NSInteger)hasWatch
 {
@@ -239,6 +324,7 @@ NSString* const kCountlyMetricKeyInstalledWatchApp  = @"_installed_watch_app";
     metricsDictionary[kCountlyMetricKeyOS] = CountlyDeviceInfo.osName;
     metricsDictionary[kCountlyMetricKeyOSVersion] = CountlyDeviceInfo.osVersion;
     metricsDictionary[kCountlyMetricKeyAppVersion] = CountlyDeviceInfo.appVersion;
+    metricsDictionary[kCountlyMetricKeyNetworkType] = CountlyDeviceInfo.networkType;
 
     NSString *carrier = CountlyDeviceInfo.carrier;
     if (carrier)
